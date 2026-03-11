@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>The Market Brief — AI Financial Intelligence</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:#f5f0e8;font-family:'DM Serif Display',Georgia,serif;min-height:100vh}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    @keyframes blink{50%{opacity:0}}
+    @keyframes slideUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+    .pulse{animation:pulse 1.4s ease-in-out infinite}
+    .spin{animation:spin .8s linear infinite}
+    .blink{animation:blink 1s step-end infinite}
+    .fadeIn{animation:fadeIn .35s ease}
+    .slideUp{animation:slideUp .3s ease}
+    button:disabled{opacity:.45;cursor:not-allowed!important}
+    input:focus{outline:none;border-color:#c9a84c!important}
+    ::-webkit-scrollbar{height:4px}
+    ::-webkit-scrollbar-track{background:#f5f0e8}
+    ::-webkit-scrollbar-thumb{background:#d4cfc4}
+    @media(max-width:600px){
+      .two-col{grid-template-columns:1fr!important}
+      .three-col{grid-template-columns:1fr 1fr!important}
+      .headline{font-size:36px!important}
+    }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect} = React;
+
+// ── constants ─────────────────────────────────────────────────────────────────
+const SLIDES = [
+  {id:"summary",       label:"Summary",  icon:"📋"},
+  {id:"sp500",         label:"S&P 500",  icon:"📈"},
+  {id:"nigeria",       label:"NGX",      icon:"🇳🇬"},
+  {id:"global",        label:"Global",   icon:"🌍"},
+  {id:"news",          label:"News",     icon:"📰"},
+  {id:"opportunities", label:"Picks",    icon:"💡"},
+];
+
+const STEPS = [
+  "Scanning S&P 500 data...",
+  "Analysing NGX All-Share Index...",
+  "Fetching global indices...",
+  "Reading world news feeds...",
+  "Identifying investment signals...",
+  "Composing your morning briefing...",
+];
+
+// ── main app ──────────────────────────────────────────────────────────────────
+function App() {
+  const [tab, setTab]             = useState("dashboard");
+  const [email, setEmail]         = useState("");
+  const [loading, setLoading]     = useState(false);
+  const [step, setStep]           = useState(0);
+  const [briefing, setBriefing]   = useState(null);
+  const [slide, setSlide]         = useState("summary");
+  const [toast, setToast]         = useState(null);
+  const [sending, setSending]     = useState(false);
+
+  const flash = (msg, type="ok") => {
+    setToast({msg,type});
+    setTimeout(()=>setToast(null), 5000);
+  };
+
+  const startSteps = () => {
+    let i = 0;
+    setStep(0);
+    const iv = setInterval(()=>{ i=(i+1)%STEPS.length; setStep(i); }, 2000);
+    return iv;
+  };
+
+  const generate = async () => {
+    setLoading(true); setBriefing(null);
+    const iv = startSteps();
+    try {
+      const res  = await fetch("/.netlify/functions/generate", { method:"POST", headers:{"Content-Type":"application/json"}, body:"{}" });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || "Generation failed");
+      setBriefing(json.data);
+      setSlide("summary");
+      flash("Briefing ready ✓");
+    } catch(e){ flash(e.message,"err"); }
+    finally{ clearInterval(iv); setLoading(false); }
+  };
+
+  const sendEmail = async () => {
+    if (!email.trim()) return flash("Enter your email address","err");
+    setSending(true);
+    const iv = startSteps();
+    try {
+      const res  = await fetch("/.netlify/functions/send", {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({email}),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || "Send failed");
+      flash(`📧 Sent to ${email} ✓`);
+    } catch(e){ flash(e.message,"err"); }
+    finally{ clearInterval(iv); setSending(false); }
+  };
+
+  const today = new Date().toLocaleDateString("en-US",{weekday:"long",year:"numeric",month:"long",day:"numeric"});
+
+  return (
+    <div style={{maxWidth:1060,margin:"0 auto",padding:"0 20px 80px"}}>
+
+      {/* ── MASTHEAD ── */}
+      <header style={{borderBottom:"3px double #0a0a0f",padding:"28px 0 14px",textAlign:"center"}}>
+        <div style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:10,letterSpacing:3,color:"#7a7a8a",textTransform:"uppercase",marginBottom:8}}>
+          AI-POWERED FINANCIAL INTELLIGENCE
+        </div>
+        <h1 className="headline" style={{fontFamily:"'DM Serif Display',serif",fontSize:52,lineHeight:1,color:"#0a0a0f",fontWeight:400}}>
+          The Market <em style={{color:"#c9a84c",fontStyle:"italic"}}>Brief</em>
+        </h1>
+        <div style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:11,color:"#7a7a8a",marginTop:8,letterSpacing:1}}>
+          {today.toUpperCase()}
+        </div>
+        <div style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:10,color:"#7a7a8a",letterSpacing:3,
+          textTransform:"uppercase",borderTop:"1px solid #d4cfc4",borderBottom:"1px solid #d4cfc4",
+          padding:"5px 0",marginTop:10}}>
+          S&P 500 · NGX NIGERIA · GLOBAL MARKETS · WORLD NEWS · OPPORTUNITIES
+        </div>
+      </header>
+
+      {/* ── NAV ── */}
+      <nav style={{display:"flex",gap:4,padding:"10px 0",borderBottom:"1px solid #d4cfc4",alignItems:"center",flexWrap:"wrap"}}>
+        {[["dashboard","📊 Dashboard"],["email","📧 Email"],["about","ℹ️ About"]].map(([id,label])=>(
+          <button key={id} onClick={()=>setTab(id)} style={{
+            background:"none",border:"none",fontFamily:"'IBM Plex Mono',monospace",fontSize:11,
+            letterSpacing:1,textTransform:"uppercase",cursor:"pointer",padding:"8px 16px",
+            color:tab===id?"#0a0a0f":"#7a7a8a",
+            borderBottom:tab===id?"2px solid #c9a84c":"2px solid transparent",
+          }}>{label}</button>
+        ))}
+      </nav>
+
+      {/* ════════════════ DASHBOARD ════════════════ */}
+      {tab==="dashboard" && <>
+
+        {/* status ticker */}
+        {loading && (
+          <div style={{background:"#0a0a0f",color:"#c9a84c",padding:"8px 16px",display:"flex",
+            gap:8,alignItems:"center",margin:"0 -20px"}}>
+            <div className="pulse" style={{width:6,height:6,borderRadius:"50%",background:"#c9a84c",flexShrink:0}}/>
+            <span style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:11}}>{STEPS[step]}</span>
+          </div>
+        )}
+
+        {/* action bar */}
+        <div style={{display:"flex",gap:12,alignItems:"center",padding:"16px 0",
+          borderBottom:"1px solid #d4cfc4",flexWrap:"wrap"}}>
+          <div style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:11,color:"#7a7a8a",flex:1}}>
+            {briefing ? `Generated ${new Date().toLocaleTimeString()}` : "Click Generate — the AI agent does the rest"}
+          </div>
+          <button onClick={generate} disabled={loading} style={{
+            background:"#c9a84c",color:"#0a0a0f",border:"none",padding:"11px 32px",
+            fontFamily:"'IBM Plex Mono',monospace",fontSize:11,letterSpacing:2,
+            textTransform:"uppercase",cursor:"pointer",fontWeight:700}}>
+            {loading ? "Researching..." : "⚡ Generate Briefing"}
+          </button>
+        </div>
+
+        {/* empty state */}
+        {!briefing && !loading && (
+          <div style={{padding:"80px 20px",textAlign:"center",border:"2px dashed #d4cfc4",
+            background:"white",marginTop:32}}>
+            <div style={{fontSize:56}}>📊</div>
+            <div style={{fontFamily:"'DM Serif Display',serif",fontSize:24,marginTop:14}}>Your morning briefing awaits</div>
+            <div style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:12,color:"#7a7a8a",marginTop:8}}>
+              Hit Generate — AI researches markets, news, and investment opportunities instantly
+            </div>
+          </div>
+        )}
+
+        {/* spinner */}
+        {loading && (
+          <div style={{padding:"80px",textAlign:"center"}}>
+            <div className="spin" style={{width:40,height:40,border:"2px solid #d4cfc4",
+              borderTopColor:"#c9a84c",borderRadius:"50%",margin:"0 auto"}}/>
+            <div className="blink" style={{fontFamily:"'IBM Plex Mono',monospace",
+              fontSize:11,color:"#7a7a8a",marginTop:16}}>{STEPS[step]}_</div>
+          </div>
+        )}
+
+        {/* slides */}
+        {briefing && !loading && (
+          <div className="fadeIn">
+            {/* tabs */}
+            <div style={{display:"flex",overflowX:"auto",borderBottom:"2px solid #0a0a0f",marginTop:24,gap:0}}>
+              {SLIDES.map(sl=>(
+                <button key={sl.id} onClick={()=>setSlide(sl.id)} style={{
+                  padding:"8px 16px",fontFamily:"'IBM Plex Mono',monospace",fontSize:10,
+                  letterSpacing:1,textTransform:"uppercase",border:"none",background:"none",
+                  cursor:"pointer",whiteSpace:"nowrap",
+                  color:slide===sl.id?"#0a0a0f":"#7a7a8a",
+                  borderBottom:slide===sl.id?"3px solid #c9a84c":"3px solid transparent",
+                  marginBottom:-2,fontWeight:slide===sl.id?"600":"400"}}>
+                  {sl.icon} {sl.label}
+                </button>
+              ))}
+            </div>
+            {/* slide content */}
+            <div className="fadeIn" key={slide}>
+              {slide==="summary"       && <SummarySlide  d={briefing.summary}/>}
+              {slide==="sp500"         && <SP500Slide    d={briefing.sp500}/>}
+              {slide==="nigeria"       && <NGXSlide      d={briefing.nigeria}/>}
+              {slide==="global"        && <GlobalSlide   d={briefing.global}/>}
+              {slide==="news"          && <NewsSlide     d={briefing.news}/>}
+              {slide==="opportunities" && <OppSlide      d={briefing.opportunities}/>}
+            </div>
+          </div>
+        )}
+      </>}
+
+      {/* ════════════════ EMAIL TAB ════════════════ */}
+      {tab==="email" && (
+        <div style={{maxWidth:520,margin:"36px auto 0"}}>
+          <div style={{background:"white",border:"1px solid #d4cfc4",padding:28}}>
+            <div style={{fontFamily:"'DM Serif Display',serif",fontSize:22,
+              borderBottom:"1px solid #e8e4dc",paddingBottom:10,marginBottom:16}}>
+              📧 Send Briefing to Your Inbox
+            </div>
+            <p style={{fontFamily:"'IBM Plex Sans',sans-serif",fontSize:14,color:"#7a7a8a",
+              lineHeight:1.8,marginBottom:20}}>
+              Enter your email. The agent generates today's full market briefing and sends it to you as a beautiful HTML newsletter — instantly.
+            </p>
+            <label style={{display:"block",fontFamily:"'IBM Plex Mono',monospace",fontSize:10,
+              letterSpacing:2,textTransform:"uppercase",color:"#7a7a8a",marginBottom:6}}>
+              Your Email Address
+            </label>
+            <input type="email" placeholder="you@example.com" value={email}
+              onChange={e=>setEmail(e.target.value)}
+              onKeyDown={e=>e.key==="Enter"&&sendEmail()}
+              style={{width:"100%",border:"1px solid #d4cfc4",padding:"12px 14px",
+                fontFamily:"'IBM Plex Mono',monospace",fontSize:13,
+                background:"#faf8f4",color:"#0a0a0f"}}/>
+            <button onClick={sendEmail} disabled={sending} style={{
+              background:"#0a0a0f",color:"#f5f0e8",border:"none",padding:"13px",
+              width:"100%",marginTop:14,fontFamily:"'IBM Plex Mono',monospace",
+              fontSize:12,letterSpacing:2,textTransform:"uppercase",cursor:"pointer"}}>
+              {sending ? "Generating & Sending..." : "📧 Send Me Today's Briefing"}
+            </button>
+            <p style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:10,color:"#7a7a8a",
+              marginTop:14,lineHeight:1.8,textAlign:"center"}}>
+              Daily 9AM email is configured via Netlify scheduled functions.<br/>
+              Use this button to get a briefing any time on demand.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ════════════════ ABOUT TAB ════════════════ */}
+      {tab==="about" && (
+        <div style={{maxWidth:700,margin:"36px auto 0"}}>
+
+          <div style={{background:"#0a0a0f",padding:"36px",marginBottom:24,textAlign:"center"}}>
+            <div style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:9,letterSpacing:3,
+              color:"#c9a84c",textTransform:"uppercase",marginBottom:10}}>WHAT IS THIS?</div>
+            <div style={{fontFamily:"'DM Serif Display',serif",fontSize:28,color:"#f5f0e8",lineHeight:1.3,marginBottom:14}}>
+              Your AI-powered morning<br/><em style={{color:"#c9a84c"}}>financial intelligence agent</em>
+            </div>
+            <div style={{fontFamily:"'IBM Plex Sans',sans-serif",fontSize:14,color:"#9a9aaa",lineHeight:1.8,maxWidth:480,margin:"0 auto"}}>
+              The Market Brief researches S&P 500, Nigerian Stock Exchange, global markets, and world news every day — then delivers a concise, beautifully formatted briefing to your inbox before the trading day begins.
+            </div>
+          </div>
+
+          {/* coverage */}
+          <div style={{background:"white",border:"1px solid #d4cfc4",marginBottom:20}}>
+            <div style={{borderBottom:"2px solid #0a0a0f",padding:"14px 22px"}}>
+              <div style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:9,letterSpacing:3,color:"#c9a84c",textTransform:"uppercase",marginBottom:3}}>COVERAGE</div>
+              <div style={{fontFamily:"'DM Serif Display',serif",fontSize:18}}>What the agent tracks daily</div>
+            </div>
+            <div className="three-col" style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)"}}>
+              {[
+                {icon:"📈",label:"S&P 500",     desc:"Level, change, sector trends, signal"},
+                {icon:"🇳🇬",label:"NGX Nigeria",  desc:"All-Share Index, top movers, analysis"},
+                {icon:"🌍",label:"Global Markets",desc:"Dow, NASDAQ, FTSE 100, Oil, Gold, NGN"},
+                {icon:"📰",label:"World News",   desc:"Top 3 macro stories + market impact"},
+                {icon:"💡",label:"Opportunities",desc:"2–3 picks including Nigerian stocks"},
+                {icon:"📋",label:"Summary",      desc:"Executive snapshot & overall mood"},
+              ].map((item,i)=>(
+                <div key={i} style={{padding:"16px 18px",borderBottom:"1px solid #f0ece4",borderRight:"1px solid #f0ece4"}}>
+                  <div style={{fontSize:22,marginBottom:6}}>{item.icon}</div>
+                  <div style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:11,fontWeight:600,marginBottom:4}}>{item.label}</div>
+                  <div style={{fontFamily:"'IBM Plex Sans',sans-serif",fontSize:12,color:"#7a7a8a",lineHeight:1.6}}>{item.desc}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* how it works */}
+          <div style={{background:"white",border:"1px solid #d4cfc4",marginBottom:20}}>
+            <div style={{borderBottom:"2px solid #0a0a0f",padding:"14px 22px"}}>
+              <div style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:9,letterSpacing:3,color:"#c9a84c",textTransform:"uppercase",marginBottom:3}}>HOW IT WORKS</div>
+              <div style={{fontFamily:"'DM Serif Display',serif",fontSize:18}}>Three steps, every morning</div>
+            </div>
+            <div style={{padding:"18px 22px"}}>
+              {[
+                {n:"01",t:"Agent researches",   d:"Netlify serverless function calls Gemini AI with a detailed financial prompt. Your API key stays on the server — never exposed to the browser."},
+                {n:"02",t:"Briefing compiled",   d:"AI returns a fully structured briefing — specific numbers, analysis, news stories, and investment picks — rendered instantly as interactive slides."},
+                {n:"03",t:"Email delivered",     d:"A rich HTML newsletter lands in your inbox every morning at 9AM automatically. Or send yourself one any time using the Email tab."},
+              ].map((item,i)=>(
+                <div key={i} style={{display:"flex",gap:18,padding:"14px 0",borderBottom:"1px solid #f0ece4"}}>
+                  <div style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:24,fontWeight:700,color:"#c9a84c",flexShrink:0}}>{item.n}</div>
+                  <div>
+                    <div style={{fontFamily:"'DM Serif Display',serif",fontSize:16,marginBottom:4}}>{item.t}</div>
+                    <div style={{fontFamily:"'IBM Plex Sans',sans-serif",fontSize:13,color:"#7a7a8a",lineHeight:1.7}}>{item.d}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* stack */}
+          <div style={{background:"white",border:"1px solid #d4cfc4",marginBottom:24}}>
+            <div style={{borderBottom:"2px solid #0a0a0f",padding:"14px 22px"}}>
+              <div style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:9,letterSpacing:3,color:"#c9a84c",textTransform:"uppercase",marginBottom:3}}>BUILT WITH</div>
+              <div style={{fontFamily:"'DM Serif Display',serif",fontSize:18}}>Tech stack</div>
+            </div>
+            <div style={{padding:"16px 22px",display:"flex",flexWrap:"wrap",gap:8}}>
+              {["React (CDN)","Netlify Functions","Netlify Scheduler","Google Gemini AI","Nodemailer + Gmail","Vanilla HTML/CSS"].map((t,i)=>(
+                <span key={i} style={{background:"#f5f0e8",border:"1px solid #d4cfc4",
+                  padding:"5px 12px",fontFamily:"'IBM Plex Mono',monospace",fontSize:11}}>{t}</span>
+              ))}
+            </div>
+          </div>
+
+          <div style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:10,color:"#7a7a8a",
+            textAlign:"center",padding:"14px 0",borderTop:"1px solid #d4cfc4",lineHeight:1.9}}>
+            THE MARKET BRIEF · Built for BuildFast Hackathon · March 2026<br/>
+            <span style={{color:"#c9a84c"}}>Not financial advice. Always do your own research.</span>
+          </div>
+        </div>
+      )}
+
+      {/* ── TOAST ── */}
+      {toast && (
+        <div className="slideUp" style={{
+          position:"fixed",bottom:24,right:24,background:"#0a0a0f",color:"#f5f0e8",
+          padding:"14px 22px",fontFamily:"'IBM Plex Mono',monospace",fontSize:12,
+          letterSpacing:1,borderLeft:`4px solid ${toast.type==="err"?"#c0392b":"#c9a84c"}`,
+          zIndex:999,maxWidth:360,lineHeight:1.5}}>
+          {toast.msg}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── SHARED COMPONENTS ─────────────────────────────────────────────────────────
+function Badge({signal}) {
+  const c = {bullish:{bg:"#e8f5e9",fg:"#1a6b3a"},bearish:{bg:"#fdecea",fg:"#c0392b"},neutral:{bg:"#fef9e7",fg:"#c9a84c"}};
+  const col = c[signal]||c.neutral;
+  return <span style={{background:col.bg,color:col.fg,padding:"3px 10px",
+    fontFamily:"'IBM Plex Mono',monospace",fontSize:10,fontWeight:700,
+    letterSpacing:1,textTransform:"uppercase"}}>{signal||"neutral"}</span>;
+}
+
+function Slide({category,headline,footer,children}) {
+  const now = new Date();
+  return (
+    <div style={{background:"white",border:"1px solid #d4cfc4"}}>
+      <div style={{borderBottom:"2px solid #0a0a0f",padding:"20px 26px",
+        display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12}}>
+        <div>
+          <div style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:9,letterSpacing:3,
+            textTransform:"uppercase",color:"#c9a84c",marginBottom:4}}>{category}</div>
+          <div style={{fontFamily:"'DM Serif Display',serif",fontSize:26,lineHeight:1.2}}>{headline}</div>
+        </div>
+        <div style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:10,color:"#7a7a8a",
+          textAlign:"right",flexShrink:0}}>
+          {now.toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"})}<br/>
+          {now.toLocaleDateString("en-US",{month:"short",day:"numeric"})}
+        </div>
+      </div>
+      <div className="two-col" style={{padding:26,display:"grid",gridTemplateColumns:"1fr 1fr",gap:22}}>
+        {children}
+      </div>
+      <div style={{borderTop:"1px solid #d4cfc4",padding:"10px 26px",
+        display:"flex",justifyContent:"space-between"}}>
+        <span style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:9,color:"#7a7a8a"}}>THE MARKET BRIEF · AI-GENERATED</span>
+        <span style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:9,color:"#7a7a8a"}}>{footer}</span>
+      </div>
+    </div>
+  );
+}
+
+function Block({label,value,change,dir,accent,children}) {
+  const lineCol = accent||(dir==="up"?"#1a6b3a":dir==="down"?"#c0392b":"#d4cfc4");
+  const numCol  = dir==="up"?"#1a6b3a":dir==="down"?"#c0392b":"#7a7a8a";
+  return (
+    <div style={{borderLeft:`3px solid ${lineCol}`,paddingLeft:14}}>
+      {label  && <div style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:9,letterSpacing:2,textTransform:"uppercase",color:"#7a7a8a",marginBottom:6}}>{label}</div>}
+      {value  && <div style={{fontFamily:"'DM Serif Display',serif",fontSize:32,lineHeight:1,marginBottom:4}}>{value}</div>}
+      {change && <div style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:13,fontWeight:700,color:numCol,marginBottom:6}}>{change}</div>}
+      {children}
+    </div>
+  );
+}
+
+function Bullets({items=[]}) {
+  return (
+    <ul style={{listStyle:"none",padding:0,margin:"10px 0 0"}}>
+      {items.map((it,i)=>(
+        <li key={i} style={{fontFamily:"'IBM Plex Sans',sans-serif",fontSize:13,lineHeight:1.65,
+          padding:"6px 0",borderBottom:"1px solid #f0ece4",display:"flex",gap:8,color:"#2c2c3a"}}>
+          <span style={{color:"#c9a84c",fontFamily:"'IBM Plex Mono',monospace",fontSize:11,flexShrink:0,marginTop:2}}>→</span>
+          {it}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function Txt({children}) {
+  return <div style={{fontFamily:"'IBM Plex Sans',sans-serif",fontSize:13,lineHeight:1.75,color:"#2c2c3a"}}>{children}</div>;
+}
+
+function SummarySlide({d={}}) {
+  return (
+    <Slide category="Executive Summary" headline={d.headline||"Market Briefing"} footer={`MOOD: ${(d.mood||"").toUpperCase()}`}>
+      <Block label="S&P 500 Snapshot" dir="neutral" accent="#c9a84c"><Txt>{d.sp500_snapshot}</Txt></Block>
+      <Block label="NGX Nigeria" dir="neutral" accent="#c9a84c">
+        <Txt>{d.ngx_snapshot}</Txt>
+        <div style={{marginTop:8}}><Badge signal={d.signal}/></div>
+      </Block>
+      <div style={{gridColumn:"1/-1"}}>
+        <div style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:9,letterSpacing:2,textTransform:"uppercase",color:"#7a7a8a",marginBottom:6}}>TOP STORY</div>
+        <Txt>{d.top_story}</Txt>
+      </div>
+    </Slide>
+  );
+}
+
+function SP500Slide({d={}}) {
+  return (
+    <Slide category="S&P 500 Index" headline={d.headline||"S&P 500"} footer="NYSE / CBOE">
+      <Block label="Current Level" value={d.level} change={d.change} dir={d.direction}>
+        <div style={{marginTop:8}}><Badge signal={d.signal}/></div>
+      </Block>
+      <div>
+        <div style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:9,letterSpacing:2,textTransform:"uppercase",color:"#7a7a8a",marginBottom:6}}>ANALYSIS</div>
+        <Txt>{d.trend}</Txt>
+        <Bullets items={d.sectors}/>
+      </div>
+    </Slide>
+  );
+}
+
+function NGXSlide({d={}}) {
+  return (
+    <Slide category="Nigerian Stock Exchange (NGX)" headline={d.headline||"NGX"} footer="LAGOS — NGX GROUP">
+      <Block label="All-Share Index" value={d.allshare} change={d.change} dir={d.direction}>
+        <div style={{marginTop:8}}><Badge signal={d.signal}/></div>
+      </Block>
+      <div>
+        <div style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:9,letterSpacing:2,textTransform:"uppercase",color:"#7a7a8a",marginBottom:6}}>TOP MOVERS</div>
+        <Bullets items={d.top_movers}/>
+        <div style={{marginTop:12}}><Txt>{d.analysis}</Txt></div>
+      </div>
+    </Slide>
+  );
+}
+
+function GlobalSlide({d={}}) {
+  return (
+    <Slide category="Global Markets" headline={d.headline||"Global Overview"} footer="WORLD INDICES">
+      <div className="three-col" style={{gridColumn:"1/-1",display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14}}>
+        {(d.indices||[]).map((idx,i)=>(
+          <Block key={i} label={idx.name} value={idx.value} change={idx.change} dir={idx.dir}/>
+        ))}
+      </div>
+      <div style={{gridColumn:"1/-1"}}>
+        <div style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:9,letterSpacing:2,textTransform:"uppercase",color:"#7a7a8a",marginBottom:6}}>GLOBAL PICTURE</div>
+        <Txt>{d.summary}</Txt>
+      </div>
+    </Slide>
+  );
+}
+
+function NewsSlide({d={}}) {
+  return (
+    <Slide category="World News & Macro" headline={d.headline||"Today's Headlines"} footer="CURATED BY AI">
+      <div style={{gridColumn:"1/-1"}}>
+        {(d.stories||[]).map((st,i)=>(
+          <div key={i} style={{borderLeft:"3px solid #c9a84c",paddingLeft:14,marginBottom:20}}>
+            <div style={{fontFamily:"'DM Serif Display',serif",fontSize:16,marginBottom:4}}>{st.title}</div>
+            <Txt>{st.impact}</Txt>
+          </div>
+        ))}
+      </div>
+    </Slide>
+  );
+}
+
+function OppSlide({d={}}) {
+  return (
+    <Slide category="Investment Opportunities" headline={d.headline||"Today's Picks"} footer="NOT FINANCIAL ADVICE">
+      <div style={{gridColumn:"1/-1"}}>
+        {(d.picks||[]).map((p,i)=>(
+          <div key={i} style={{borderBottom:"1px solid #e8e4dc",padding:"14px 0"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+              marginBottom:8,flexWrap:"wrap",gap:8}}>
+              <div>
+                <span style={{fontFamily:"'IBM Plex Mono',monospace",fontWeight:700,fontSize:17}}>{p.ticker}</span>
+                <span style={{fontFamily:"'IBM Plex Sans',sans-serif",color:"#7a7a8a",fontSize:13,marginLeft:12}}>{p.name}</span>
+              </div>
+              <Badge signal={p.signal}/>
+            </div>
+            <Txt>{p.thesis}</Txt>
+          </div>
+        ))}
+        <div style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:10,color:"#7a7a8a",
+          marginTop:14,lineHeight:1.7}}>{d.disclaimer}</div>
+      </div>
+    </Slide>
+  );
+}
+
+// ── mount ─────────────────────────────────────────────────────────────────────
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
